@@ -1,0 +1,38 @@
+{
+  "name": "icsorg",
+  "version": "1.0.0",
+  "description": "Import ICS file into org for inclusion in org agenda",
+  "main": "src/index.js",
+  "bin": "src/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/theophilusx/icsorg.git"
+  },
+  "keywords": [
+    "ics",
+    "calendar",
+    "org-mode"
+  ],
+  "author": "Tim Cross",
+  "email": "theophilusx@gmail.com",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/theophilusx/icsorg/issues"
+  },
+  "homepage": "https://github.com/theophilusx/icsorg#readme",
+  "dependencies": {
+    "dotenv": "^10.0.0",
+    "ical-expander": "^3.1.0",
+    "luxon": "^2.0.1"
+  },
+  "devDependencies": {
+    "chai": "^4.3.4",
+    "eslint": "^7.32.0",
+    "eslint-config-prettier": "^8.3.0",
+    "mocha": "^9.0.3",
+    "prettier": "^2.3.2"
+  }
+}

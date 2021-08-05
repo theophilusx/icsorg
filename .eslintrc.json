@@ -1,0 +1,20 @@
+{
+  "extends": ["eslint:recommended", "prettier"],
+  "rules": {
+    "no-console": 0,
+    "quotes": ["error", "double"]
+  },
+  "plugins": [],
+  "parserOptions": {
+    "ecmaVersion": 2021,
+    "ecmaFeatures": {
+      "impliedStrict": true
+    }
+  },
+  "env": {
+    "es6": true,
+    "node": true,
+    "browser": false,
+    "mocha": true
+  }
+}
