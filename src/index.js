@@ -1,5 +1,6 @@
 "use strict";
 
+const { Readable } = require("stream");
 const IcalExpander = require("ical-expander");
 const fs = require("fs");
 const { DateTime } = require("luxon");
@@ -129,32 +130,31 @@ function makeMailtoLink(email) {
   return email;
 }
 
-function dumpEvent(e) {
-  let data = [];
-  data.push(`* ${e.summary}`);
-  data.push(":PROPERTIES:");
-  data.push(":ICAL_EVENT:    t");
-  data.push(`:ID:            ${e.uid}`);
+function dumpEvent(e, rs) {
+  rs.push(`* ${e.summary}\n`);
+  rs.push(":PROPERTIES:\n");
+  rs.push(":ICAL_EVENT:    t\n");
+  rs.push(`:ID:            ${e.uid}\n`);
   e.organizer
-    ? data.push(`:ORGANIZER:     ${makeMailtoLink(e.organizer)}`)
+    ? rs.push(`:ORGANIZER:     ${makeMailtoLink(e.organizer)}\n`)
     : null;
-  e.status ? data.push(`:STATUS:        ${e.status}`) : null;
+  e.status ? rs.push(`:STATUS:        ${e.status}\n`) : null;
   e.modified
-    ? data.push(`:LAST_MODIFIED: ${makeTimestamp(e.modified, "inactive")}`)
+    ? rs.push(`:LAST_MODIFIED: ${makeTimestamp(e.modified, "inactive")}\n`)
     : null;
-  e.location ? data.push(`:LOCATION:      ${e.location}`) : null;
-  e.duration ? data.push(`:DURATION:      ${parseDuration(e.duration)}`) : null;
+  e.location ? rs.push(`:LOCATION:      ${e.location}\n`) : null;
+  e.duration ? rs.push(`:DURATION:      ${parseDuration(e.duration)}\n`) : null;
   e.attendees.length
-    ? data.push(
-        `:ATTENDEES:  ${e.attendees
+    ? rs.push(
+        `:ATTENDEES:    ${e.attendees
           .map((a) => `${makeMailtoLink(a.cn)} (${a.status})`)
           .join(", ")}`
-      )
+      ) && rs.push("\n")
     : null;
-  data.push(":END:");
-  data.push(makeTimestampRange(e.startDate, e.endDate));
-  e.description ? data.push(`\n${e.description}`) : null;
-  console.log(data.join("\n"));
+  rs.push(":END:\n");
+  rs.push(makeTimestampRange(e.startDate, e.endDate));
+  rs.push("\n");
+  e.description ? rs.push(`\n${e.description}\n`) : null;
 }
 
 function getPropertyValue(name, component) {
@@ -210,6 +210,30 @@ function mapOccurences(occurrences) {
   return mappedOccurrences;
 }
 
+function createOrgFile(fileName, events) {
+  const header = [
+    `#+TITLE:       ${TITLE}\n`,
+    `#+AUTHOR:      ${AUTHOR}\n`,
+    `#+EMAIL:       ${EMAIL}\n`,
+    "#+DESCRIPTION: converted using icsorg node script\n",
+    `#+CATEGORY:    ${CATEGORY}\n`,
+    `#+STARTUP:     ${STARTUP}\n`,
+    `#+FILETAGS:    ${FILETAGS}\n`,
+    "\n",
+  ];
+
+  try {
+    let of = fs.createWriteStream(fileName, { encoding: "utf-8", flags: "w" });
+    let rs = new Readable();
+    header.forEach((h) => rs.push(h));
+    events.forEach((e) => dumpEvent(e, rs));
+    rs.push(null);
+    rs.pipe(of);
+  } catch (err) {
+    throw new Error(`createOrgFile: ${err.message}`);
+  }
+}
+
 if (argv.h || argv.help) {
   doHelp();
 }
@@ -254,4 +278,4 @@ const events = expander.between(startDate.toJSDate(), endDate.toJSDate());
 const mappedEvents = mapEvents(events.events);
 const mappedOccurrences = mapOccurences(events.occurrences);
 let allEvents = [...mappedEvents, ...mappedOccurrences];
-allEvents.forEach((e) => dumpEvent(e));
+createOrgFile(ORG_FILE, allEvents);
