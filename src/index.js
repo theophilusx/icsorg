@@ -115,9 +115,12 @@ function makeTimestampRange(start, end) {
   const fmt = "<yyyy-LL-dd ccc HH:mm>";
   const sDate = DateTime.fromJSDate(start);
   const eDate = DateTime.fromJSDate(end);
-  return `${sDate.toFormat(fmt, { locale: "au" })}--${eDate.toFormat(fmt, {
-    locale: "au",
-  })}`;
+  if (sDate.hasSame(eDate, "day")) {
+    let fmt1 = "<yyyy-LL-dd ccc HH:mm-";
+    let fmt2 = "HH:mm>";
+    return `${sDate.toFormat(fmt1)}${eDate.toFormat(fmt2)}`;
+  }
+  return `${sDate.toFormat(fmt)}--${eDate.toFormat(fmt)}`;
 }
 
 function makeMailtoLink(email) {
