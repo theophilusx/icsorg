@@ -1,4 +1,5 @@
 #+TITLE: icsorg
+#+OPTIONS: toc:nil
 
 * icsorg - Import Calendar Events into Emacs Org Mode
 
@@ -15,12 +16,10 @@ files scanned by org to generate the agenda, these events will show up as
 entries in the agenda. This script does not do any upstream synchronisation - it
 does not push events back out to a remote service like /Google/ or /Office 365/.
 
-#+begin_notes
 *Caveats*: This script has not been heavily tested and has only been run on
  Linux platforms. I wrote it to scratch my own itch, which it appears to be
  doing quite effectively. I don't run Windows, but will likely also use it on
  macOS.
-#+end_notes
  
 * Installation
 
@@ -32,16 +31,16 @@ normally on your execution =PATH=.
 
 Install the script either by running
 
-#+begin_example
+#+begin_src shell
   npm i -g icsorg
-#+end_example
+#+end_src
 
 Alternatively, you can use the =npx= command to both install and run the script.
 e.g.
 
-#+begin_example
+#+begin_src shell
   npx icsorg -h
-#+end_example
+#+end_src
 
 The above line will install the script and run it with the =-h= option, which
 will display a short help message.
@@ -52,8 +51,6 @@ The script has a short help screen which is displayed when you use the =-h=
 option. e.g.
 
 #+begin_example
-  ─tim@tim-desktop ~/Projects/javascript/icsorg/src  ‹master*› 
-  ╰─➤  icsorg -h
   Usage: icsorg <optional arguments>
   
   Arguments:
@@ -88,8 +85,6 @@ option. e.g.
     FUTURE -   Number of days into the future to include events from. Default 365
   
     Homepage - https://github.com/theophilusx/icsorg
-  ╭─tim@tim-desktop ~/Projects/javascript/icsorg/src  ‹master*› 
-  ╰─➤  _
 #+end_example
 
 The script uses the =dotenv= module to read a resource file of setting used by
@@ -97,7 +92,7 @@ the script. Most of these settings can be overridden with command line options.
 The script looks for this resource file in your home directory by default. A
 sample configuration file is shown below.
 
-#+begin_example
+#+begin_src config
   AUTHOR="Fred Flintstone" # Your name - used to match attendees for an event
   EMAIL=fred@bedrock.com   # Your email address - also used for attendee matching
   ICS_FILE=/home/fred/google.ics # location of the ics file to use as input
@@ -108,7 +103,7 @@ sample configuration file is shown below.
   FILETAGS=EVENT
   PAST=30 # how many days into the past to look for events
   FUTURE=365 # how many days into the future to look for events
-#+end_example
+#+end_src
 
 The script, using the above settings, would generate an org file of events. A
 partial sample output is below.
@@ -167,5 +162,3 @@ your script or reference icsorg as a fully qualified path.
 I do plan to add automatic retrieval of =.ics= files via a URL. Google calendar
 has a private URL which you can use to retrieve a dump of your calendar in ics
 format. It should be trivial to add this to the script.
-
-* TODO Add support to retrieve ics file via URL
