@@ -1,5 +1,6 @@
 "use strict";
 
+const fetch = require("node-fetch");
 const { Readable } = require("stream");
 const IcalExpander = require("ical-expander");
 const fs = require("fs");
@@ -327,66 +328,99 @@ function createOrgFile(config, events) {
 }
 
 /**
+ * @async
+ *
+ * Retrieve event data from ICS source. This could be either a local file
+ * or a URL which returns an .ics file (like Google).
+ *
+ * @param {string} source - either path to a local file or a URL which will return an .ics file
+ *
+ * @returns {string} The .ics data as a string
+ */
+async function getIcsData(source) {
+  let data = "";
+
+  try {
+    if (source.startsWith("http")) {
+      // assume source is a url
+      let resp = await fetch(source);
+      data = await resp.text();
+    } else {
+      // assume is a file name
+      data = fs.readFileSync(source, "utf-8");
+    }
+    return data;
+  } catch (err) {
+    throw new Error(`getIcsData: ${err.message}`);
+  }
+}
+
+/**
+ * @async
+ *
  * Main entry point for script
  */
-function main() {
+async function main() {
   if (argv.h || argv.help) {
     doHelp();
   }
 
-  const config = {
-    RC_FILE: RC,
-    ICS_FILE: argv.i || process.env.ICS_FILE,
-    ORG_FILE: argv.o || process.env.ORG_FILE,
-    TITLE: process.env.TITLE || "Calendar",
-    AUTHOR: argv.a || process.env.AUTHOR,
-    EMAIL: argv.e || process.env.EMAIL,
-    CATEGORY: process.env.CATEGORY,
-    STARTUP: process.env.STARTUP,
-    FILETAGS: process.env.FILETAGS,
-    PAST: 7,
-    FUTURE: 365,
-  };
+  try {
+    const config = {
+      RC_FILE: RC,
+      ICS_FILE: argv.i || process.env.ICS_FILE,
+      ORG_FILE: argv.o || process.env.ORG_FILE,
+      TITLE: process.env.TITLE || "Calendar",
+      AUTHOR: argv.a || process.env.AUTHOR,
+      EMAIL: argv.e || process.env.EMAIL,
+      CATEGORY: process.env.CATEGORY,
+      STARTUP: process.env.STARTUP,
+      FILETAGS: process.env.FILETAGS,
+      PAST: 7,
+      FUTURE: 365,
+    };
 
-  if (argv.p) {
-    config.PAST = parseInt(argv.p);
-  } else if (process.env.PAST) {
-    config.PAST = parseInt(process.env.PAST);
+    if (argv.p) {
+      config.PAST = parseInt(argv.p);
+    } else if (process.env.PAST) {
+      config.PAST = parseInt(process.env.PAST);
+    }
+
+    if (argv.f) {
+      config.FUTURE = parseInt(argv.f);
+    } else if (process.env.FUTURE) {
+      config.FUTURE = parseInt(process.env.FUTURE);
+    }
+
+    config.START_DATE = DateTime.now().minus({ days: config.PAST });
+    config.END_DATE = DateTime.now().plus({ days: config.FUTURE });
+
+    if (argv.dump) {
+      dumpConfig(config);
+    }
+
+    let data = await getIcsData(config.ICS_FILE);
+    const expander = new IcalExpander({ ics: data, maxIterations: 1000 });
+    const events = expander.between(
+      config.START_DATE.toJSDate(),
+      config.END_DATE.toJSDate()
+    );
+    const mappedEvents = mapEvents(events.events, config.AUTHOR, config.EMAIL);
+    const mappedOccurrences = mapOccurences(
+      events.occurrences,
+      config.AUTHOR,
+      config.EMAIL
+    );
+    let allEvents = [...mappedEvents, ...mappedOccurrences];
+    createOrgFile(config, allEvents);
+    console.log(
+      `Generated new org file in ${config.ORG_FILE} with ${allEvents.length} entries`
+    );
+  } catch (err) {
+    throw new Error(`main: ${err.message}`);
   }
-
-  if (argv.f) {
-    config.FUTURE = parseInt(argv.f);
-  } else if (process.env.FUTURE) {
-    config.FUTURE = parseInt(process.env.FUTURE);
-  }
-
-  config.START_DATE = DateTime.now().minus({ days: config.PAST });
-  config.END_DATE = DateTime.now().plus({ days: config.FUTURE });
-
-  if (argv.dump) {
-    dumpConfig(config);
-  }
-
-  const data = fs.readFileSync(config.ICS_FILE, "utf-8");
-
-  const expander = new IcalExpander({ ics: data, maxIterations: 1000 });
-
-  const events = expander.between(
-    config.START_DATE.toJSDate(),
-    config.END_DATE.toJSDate()
-  );
-
-  const mappedEvents = mapEvents(events.events, config.AUTHOR, config.EMAIL);
-  const mappedOccurrences = mapOccurences(
-    events.occurrences,
-    config.AUTHOR,
-    config.EMAIL
-  );
-  let allEvents = [...mappedEvents, ...mappedOccurrences];
-  createOrgFile(config, allEvents);
-  console.log(
-    `Generated new org file in ${config.ORG_FILE} with ${allEvents.length} entries`
-  );
 }
 
-main();
+main().catch((err) => {
+  console.error(err.message);
+});
