@@ -5,6 +5,8 @@ This is a very simple script to assist in importing calendar events from an ICS 
 
 This work was very much inspired by the article [Google Calendar Synchronization](https://orgmode.org/worg/org-tutorials/org-google-sync.html). This script fulfils a role similar to the `ics2org` Awk script referenced in that article. Essentially, `icsorg` will read data from an `.ics` file, parse it to extract all the events and generate an entry in an `Emacs Org mode` file for each event. Provided the output file is included in the list of files scanned by org to generate the agenda, these events will show up as entries in the agenda. This script does not do any upstream synchronisation - it does not push events back out to a remote service like *Google* or *Office 365*.
 
+The script does support using a URL to specify the input `.ics` file. This is useful with *Google Calendar* as that calendar includes a private URL you can use to retrieve all your events as an `.ics` file.
+
 **Caveats**: This script has not been heavily tested and has only been run on Linux platforms. I wrote it to scratch my own itch, which it appears to be doing quite effectively. I don't run Windows, but will likely also use it on macOS.
 
 # Installation
@@ -122,8 +124,6 @@ Fun shopping for a new dress!
 
 # Workflow
 
-The basic idea would be to create a simple script which first downloads the ics file from Google (or wherever) and then calls this script to processes it. This script could then be added to a regular cron job to get updated calendar events each day (or however frequently you require).
+The basic workflow I use is to retrieve my events from my Google calendar. I use the private URL Google provides for accessing your calendar events. That URL returns an `.ics` file of all your events. The URL is used in the `.icsorgrc` configuration file for the `ICS_FILE` variable. I then have a basic cron task which runs this script every 6 hours to update my list of calendar events.
 
-An important point to remember is that when `cron` runs to execute tasks, it does not source your profile, so many environment settings. This means the directory containing the script may not be in your `PATH`. Either set it within your script or reference icsorg as a fully qualified path.
-
-I do plan to add automatic retrieval of `.ics` files via a URL. Google calendar has a private URL which you can use to retrieve a dump of your calendar in ics format. It should be trivial to add this to the script.
+Note that because this script is installed as a node module globally, it creates a symbolic link in the global `NPM` `bin` directory. However, as cron does not source your profile, the script may not be in your `PATH`. There are a number of ways to fix this, but the easiest is to just call the script with a full execution path. In my case, that is `/home/tim/.npm_global/bin/icsorg`.
