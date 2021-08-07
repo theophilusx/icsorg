@@ -9,6 +9,10 @@ const argv = require("minimist")(process.argv.slice(2));
 const RC = argv.c || `${process.env.HOME}/.icsorgrc`;
 require("dotenv").config({ path: RC });
 
+/**
+ * Display a basic usage message to the console
+ * Will call process.exit to terminate the script
+ */
 function doHelp() {
   let help = [
     "Usage: icsorg <optional arguments>",
@@ -50,37 +54,48 @@ function doHelp() {
   process.exit(0);
 }
 
-function dumpConfig() {
-  const config = [
-    `RC File = ${RC}`,
-    `AUTHOR = ${AUTHOR}`,
-    `EMAIL = ${EMAIL}`,
-    `ICS_FILE = ${ICS_FILE}`,
-    `ORG_FILE = ${ORG_FILE}`,
-    `TITLE = ${TITLE}`,
-    `CATEGORY = ${CATEGORY}`,
-    `STARTUP = ${STARTUP}`,
-    `FILETAGS = ${FILETAGS}`,
-    `PAST = ${past}`,
-    `FUTURE = ${future}`,
-    `Start Date = ${startDate}`,
-    `End Date = ${endDate}`,
-  ];
-  console.log(config.join("\n"));
+/**
+ * Dump out script configuration settings to the console.
+ * Will call process.exit to terminate the script
+ *
+ * @param {Object} config - Object containing script config settings
+ */
+function dumpConfig(config) {
+  let msg = [];
+  for (let k in config) {
+    msg.push(`${k} = ${config[k]}`);
+  }
+  console.log(msg.join("\n"));
   process.exit(0);
 }
 
-function parseAttendee(data) {
+/**
+ * Parse an attendee array to generate an attendee object
+ *
+ * @param {Array} data - Array of data about an attendee
+ * @param {string} author - Author's name - used to identify 'me' attendee
+ * @param {string} email - Email address - used to identify 'me' attendee
+ *
+ * @returns {Object} with properties for category, role, status, cn, guests and me
+ */
+function parseAttendee(data, author, email) {
   return {
     category: data.category,
     role: data.role,
     status: data.partstat,
     cn: data.cn,
     guests: data["x-num-guests"],
-    me: data.cn === AUTHOR || data.cn === EMAIL ? true : false,
+    me: data.cn === author || data.cn === email ? true : false,
   };
 }
 
+/**
+ * Parse a duration object to create a duration string
+ *
+ * @param {Object} d - duration object
+ *
+ * @returns {string}
+ */
 function parseDuration(d) {
   function pad(v) {
     return v < 10 ? `0${v}` : `${v}`;
@@ -95,6 +110,15 @@ function parseDuration(d) {
   }
 }
 
+/**
+ * Make an org timestamp from a Luxon DateTime object
+ *
+ * @param {DateTime} dt - Luxon DateTime object
+ * @param {string} type - type of timestamp. Either 'active' or 'inactive'
+ *                        Defaults to 'active'
+ *
+ * @returns {string} org timestamp string
+ */
 function makeTimestamp(dt, type = "active") {
   let start = "<";
   let end = ">";
@@ -111,6 +135,14 @@ function makeTimestamp(dt, type = "active") {
   return "";
 }
 
+/**
+ * Generates an org ranged (duration) timestamp string
+ *
+ * @param {DateTime} start - start date and time
+ * @param {DateTime} end - end date and time
+ *
+ * @returns {string} an org timestamp string
+ */
 function makeTimestampRange(start, end) {
   const fmt = "<yyyy-LL-dd ccc HH:mm>";
   const sDate = DateTime.fromJSDate(start);
@@ -123,16 +155,32 @@ function makeTimestampRange(start, end) {
   return `${sDate.toFormat(fmt)}--${eDate.toFormat(fmt)}`;
 }
 
-function makeMailtoLink(email) {
-  if (email && email.startsWith("mailto:")) {
-    let addr = email.substring(7);
-    return `[[${email}][${addr}]]`;
-  } else if (email && email.includes("@")) {
-    return `[[mailto:${email}][${email}]]`;
+/**
+ * Examines the supplied value and if it looks like a mailto or email address
+ * generates and org link string.
+ *
+ * @param {string} data - value to use.
+ *
+ * @returns {string} If value looks like a mailto or email address,
+ *                   return an org link string, otherwise, just return
+ *                   the value passed in
+ */
+function makeMailtoLink(data) {
+  if (data && data.startsWith("mailto:")) {
+    let addr = data.substring(7);
+    return `[[${data}][${addr}]]`;
+  } else if (data && data.includes("@")) {
+    return `[[mailto:${data}][${data}]]`;
   }
-  return email;
+  return data;
 }
 
+/**
+ * dumps out an event to the specified read stream
+ *
+ * @param {Object} e - event object
+ * @param {stream} rs - stream to push data onto
+ */
 function dumpEvent(e, rs) {
   rs.push(`* ${e.summary}\n`);
   rs.push(":PROPERTIES:\n");
@@ -160,15 +208,24 @@ function dumpEvent(e, rs) {
   e.description ? rs.push(`\n${e.description}\n`) : null;
 }
 
+/**
+ * Get named property from a component
+ *
+ * @param {string} name - property name
+ * @param {Object} component - an ICS component
+ *
+ * @returns {Date | string} property value
+ */
 function getPropertyValue(name, component) {
   let prop = component.getFirstProperty(name);
   if (prop) {
     switch (prop.getDefaultType()) {
       case "text":
         return prop.getFirstValue();
-      case "date-time":
+      case "date-time": {
         let val = prop.getFirstValue();
         return val.toJSDate();
+      }
       default:
         return prop.getFirstValue().toString();
     }
@@ -176,57 +233,89 @@ function getPropertyValue(name, component) {
   return "";
 }
 
-function mapEvents(events) {
-  let mappedEvents = events.map((e) => ({
-    attendees: e.attendees.map((a) => parseAttendee(a.jCal[1])),
+/**
+ * Extract common properties from event and occurrence components
+ *
+ * @param {Object} e - an event component
+ * @param {string} author - author's name
+ * @param {string} email - author's email address
+ *
+ * @returns {Object} object containing common event properties
+ */
+function commonEventProperties(e, author, email) {
+  return {
+    attendees: e.attendees.map((a) => parseAttendee(a.jCal[1]), author, email),
     description: e.description,
     duration: e.duration,
-    endDate: e.endDate.toJSDate(),
     location: e.location,
     organizer: e.organizer,
-    recurrenceId: e.recurrenceId,
-    sequence: e.sequence,
-    startDate: e.startDate.toJSDate(),
-    summary: e.summary,
     uid: e.uid,
     status: getPropertyValue("status", e.component),
     modified: getPropertyValue("last-modified", e.component),
+    summary: e.summary,
+  };
+}
+
+/**
+ * Process an array of event components to generate event objects.
+ * Returns an array of event objects.
+ *
+ * @param {Array} events - An array of event components
+ * @param {string} author - author name
+ * @param {string} email - author's email address
+ *
+ * @returns {Array} array of event objects
+ */
+function mapEvents(events, author, email) {
+  let mappedEvents = events.map((e) => ({
+    endDate: e.endDate.toJSDate(),
+    startDate: e.startDate.toJSDate(),
+    ...commonEventProperties(e, author, email),
   }));
   return mappedEvents;
 }
 
-function mapOccurences(occurrences) {
+/**
+ * Generate an array of event objects from an array of occurrence components
+ *
+ * @param {Array} occurrences - Array of occurrence components
+ * @param {string} author - author name
+ * @param {string} email - author's email address
+ *
+ * @returns {Array} array of event objects
+ */
+function mapOccurences(occurrences, author, email) {
   let mappedOccurrences = occurrences.map((o) => ({
-    recurrenceId: o.recurrenceId,
     startDate: o.startDate.toJSDate(),
     endDate: o.endDate.toJSDate(),
-    summary: o.item.summary,
-    description: o.item.description,
-    duration: o.item.duration,
-    attendees: o.item.attendees.map((a) => parseAttendee(a.jCal[1])),
-    location: o.item.location,
-    organizer: o.item.organizer,
-    uid: o.item.uid,
-    status: getPropertyValue("status", o.item.component),
-    modified: getPropertyValue("last-modified", o.item.component),
+    ...commonEventProperties(o.item, author, email),
   }));
   return mappedOccurrences;
 }
 
-function createOrgFile(fileName, events) {
+/**
+ * Create new org file from list of events
+ *
+ * @param {Object} config - configuration settings
+ * @param {Array} events - array of event objects
+ */
+function createOrgFile(config, events) {
   const header = [
-    `#+TITLE:       ${TITLE}\n`,
-    `#+AUTHOR:      ${AUTHOR}\n`,
-    `#+EMAIL:       ${EMAIL}\n`,
+    `#+TITLE:       ${config.TITLE}\n`,
+    `#+AUTHOR:      ${config.AUTHOR}\n`,
+    `#+EMAIL:       ${config.EMAIL}\n`,
     "#+DESCRIPTION: converted using icsorg node script\n",
-    `#+CATEGORY:    ${CATEGORY}\n`,
-    `#+STARTUP:     ${STARTUP}\n`,
-    `#+FILETAGS:    ${FILETAGS}\n`,
+    `#+CATEGORY:    ${config.CATEGORY}\n`,
+    `#+STARTUP:     ${config.STARTUP}\n`,
+    `#+FILETAGS:    ${config.FILETAGS}\n`,
     "\n",
   ];
 
   try {
-    let of = fs.createWriteStream(fileName, { encoding: "utf-8", flags: "w" });
+    let of = fs.createWriteStream(config.ORG_FILE, {
+      encoding: "utf-8",
+      flags: "w",
+    });
     let rs = new Readable();
     header.forEach((h) => rs.push(h));
     events.forEach((e) => dumpEvent(e, rs));
@@ -237,48 +326,67 @@ function createOrgFile(fileName, events) {
   }
 }
 
-if (argv.h || argv.help) {
-  doHelp();
+/**
+ * Main entry point for script
+ */
+function main() {
+  if (argv.h || argv.help) {
+    doHelp();
+  }
+
+  const config = {
+    RC_FILE: RC,
+    ICS_FILE: argv.i || process.env.ICS_FILE,
+    ORG_FILE: argv.o || process.env.ORG_FILE,
+    TITLE: process.env.TITLE || "Calendar",
+    AUTHOR: argv.a || process.env.AUTHOR,
+    EMAIL: argv.e || process.env.EMAIL,
+    CATEGORY: process.env.CATEGORY,
+    STARTUP: process.env.STARTUP,
+    FILETAGS: process.env.FILETAGS,
+    PAST: 7,
+    FUTURE: 365,
+  };
+
+  if (argv.p) {
+    config.PAST = parseInt(argv.p);
+  } else if (process.env.PAST) {
+    config.PAST = parseInt(process.env.PAST);
+  }
+
+  if (argv.f) {
+    config.FUTURE = parseInt(argv.f);
+  } else if (process.env.FUTURE) {
+    config.FUTURE = parseInt(process.env.FUTURE);
+  }
+
+  config.START_DATE = DateTime.now().minus({ days: config.PAST });
+  config.END_DATE = DateTime.now().plus({ days: config.FUTURE });
+
+  if (argv.dump) {
+    dumpConfig(config);
+  }
+
+  const data = fs.readFileSync(config.ICS_FILE, "utf-8");
+
+  const expander = new IcalExpander({ ics: data, maxIterations: 1000 });
+
+  const events = expander.between(
+    config.START_DATE.toJSDate(),
+    config.END_DATE.toJSDate()
+  );
+
+  const mappedEvents = mapEvents(events.events, config.AUTHOR, config.EMAIL);
+  const mappedOccurrences = mapOccurences(
+    events.occurrences,
+    config.AUTHOR,
+    config.EMAIL
+  );
+  let allEvents = [...mappedEvents, ...mappedOccurrences];
+  createOrgFile(config, allEvents);
+  console.log(
+    `Generated new org file in ${config.ORG_FILE} with ${allEvents.length} entries`
+  );
 }
 
-const ICS_FILE = argv.i || process.env.ICS_FILE;
-const ORG_FILE = argv.o || process.env.ORG_FILE;
-const TITLE = process.env.TITLE || "Calendar";
-const AUTHOR = argv.a || process.env.AUTHOR;
-const EMAIL = argv.e || process.env.EMAIL;
-const CATEGORY = process.env.CATEGORY;
-const STARTUP = process.env.STARTUP;
-const FILETAGS = process.env.FILETAGS;
-
-let past = 7;
-let future = 365;
-
-if (argv.p) {
-  past = parseInt(argv.p);
-} else if (process.env.PAST) {
-  past = parseInt(process.env.PAST);
-}
-
-if (argv.f) {
-  future = parseInt(argv.f);
-} else if (process.env.FUTURE) {
-  future = parseInt(process.env.FUTURE);
-}
-
-const startDate = DateTime.now().minus({ days: past });
-const endDate = DateTime.now().plus({ days: future });
-
-if (argv.dump) {
-  dumpConfig();
-}
-
-const data = fs.readFileSync(ICS_FILE, "utf-8");
-
-const expander = new IcalExpander({ ics: data, maxIterations: 1000 });
-
-const events = expander.between(startDate.toJSDate(), endDate.toJSDate());
-
-const mappedEvents = mapEvents(events.events);
-const mappedOccurrences = mapOccurences(events.occurrences);
-let allEvents = [...mappedEvents, ...mappedOccurrences];
-createOrgFile(ORG_FILE, allEvents);
+main();
