@@ -92,6 +92,19 @@ function parseAttendee(data, author, email) {
   };
 }
 
+/** check if duration is 24 hours or more
+ *
+ * @param {Object} d - duration object
+ *
+ * @returns {boolean}
+ */
+function checkLess24hours(d) {
+  if ((d.weeks) || (d.days)) {
+    return false;        
+  }
+  return true;            
+}
+
 /**
  * Parse a duration object to create a duration string
  *
@@ -145,8 +158,29 @@ function makeTimestamp(dt, type = "active") {
  * @param {DateTime} end - end date and time
  *
  * @returns {string} an org timestamp string
+ * (if on different days, then don't include HH:mm)
  */
-function makeTimestampRange(start, end) {
+function makeTimestampRange(start, end) {   
+  const fmt = "<yyyy-LL-dd ccc>";
+  const sDate = DateTime.fromJSDate(start);
+  const eDate = DateTime.fromJSDate(end);
+  if (sDate.hasSame(eDate, "day")) {
+    let fmt1 = "<yyyy-LL-dd ccc HH:mm-";
+    let fmt2 = "HH:mm>";
+    return `${sDate.toFormat(fmt1)}${eDate.toFormat(fmt2)}`;
+  }
+  return `${sDate.toFormat(fmt)}--${eDate.toFormat(fmt)}`;
+}
+
+/**
+ * Generates an org ranged (duration) timestamp string
+ *
+ * @param {DateTime} start - start date and time
+ * @param {DateTime} end - end date and time
+ *
+ * @returns {string} an org timestamp string
+ */
+function makeTimestampRangeDays(start, end) {   
   const fmt = "<yyyy-LL-dd ccc HH:mm>";
   const sDate = DateTime.fromJSDate(start);
   const eDate = DateTime.fromJSDate(end);
@@ -157,6 +191,21 @@ function makeTimestampRange(start, end) {
   }
   return `${sDate.toFormat(fmt)}--${eDate.toFormat(fmt)}`;
 }
+
+
+/**
+ * Generates an org day-only timestamp string
+ *
+ * @param {DateTime} date - date
+ *
+ * @returns {string} an org timestamp day-only string
+ */
+function makePlainTimestamp(date) {   
+  const fmt = "<yyyy-LL-dd ccc>";
+  const Date = DateTime.fromJSDate(date);
+  return `${Date.toFormat(fmt)}`;
+}
+
 
 /**
  * Examines the supplied value and if it looks like a mailto or email address
@@ -206,7 +255,14 @@ function dumpEvent(e, rs) {
       ) && rs.push("\n")
     : null;
   rs.push(":END:\n");
-  rs.push(makeTimestampRange(e.startDate, e.endDate));
+    if (`${parseDuration(e.duration)}` === "1 d 00:00 hh:mm") {
+        rs.push(makePlainTimestamp(e.startDate));           
+    } else {
+        if (checkLess24hours(e.duration)) {
+            rs.push(makeTimestampRangeDays(e.startDate, e.endDate));
+        } else {
+            rs.push(makeTimestampRange(e.startDate, e.endDate));
+        }}
   rs.push("\n");
   e.description ? rs.push(`\n${e.description}\n`) : null;
 }
