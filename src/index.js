@@ -160,7 +160,7 @@ function makeTimestamp(dt, type = "active") {
  * @returns {string} an org timestamp string
  * (if on different days, then don't include HH:mm)
  */
-function makeTimestampRange(start, end) {   
+function makeTimestampRangeDays(start, end) {   
   const fmt = "<yyyy-LL-dd ccc>";
   const sDate = DateTime.fromJSDate(start);
   const eDate = DateTime.fromJSDate(end);
@@ -180,7 +180,7 @@ function makeTimestampRange(start, end) {
  *
  * @returns {string} an org timestamp string
  */
-function makeTimestampRangeDays(start, end) {   
+function makeTimestampRange(start, end) {   
   const fmt = "<yyyy-LL-dd ccc HH:mm>";
   const sDate = DateTime.fromJSDate(start);
   const eDate = DateTime.fromJSDate(end);
@@ -259,9 +259,9 @@ function dumpEvent(e, rs) {
         rs.push(makePlainTimestamp(e.startDate));           
     } else {
         if (checkLess24hours(e.duration)) {
-            rs.push(makeTimestampRangeDays(e.startDate, e.endDate));
-        } else {
             rs.push(makeTimestampRange(e.startDate, e.endDate));
+        } else {
+            rs.push(makeTimestampRangeDays(e.startDate, e.endDate));
         }}
   rs.push("\n");
   e.description ? rs.push(`\n${e.description}\n`) : null;
