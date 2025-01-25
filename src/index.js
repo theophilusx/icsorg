@@ -178,7 +178,7 @@ function makeTimestampRangeDays(start, end) {
  * @param {DateTime} start - start date and time
  * @param {DateTime} end - end date and time
  *
- * @returns {string} an org timestamp string
+ * @returns {string} an org timestamp string with HH:mm included
  */
 function makeTimestampRange(start, end) {   
   const fmt = "<yyyy-LL-dd ccc HH:mm>";
@@ -255,14 +255,19 @@ function dumpEvent(e, rs) {
       ) && rs.push("\n")
     : null;
   rs.push(":END:\n");
-    if (`${parseDuration(e.duration)}` === "1 d 00:00 hh:mm") {
-        rs.push(makePlainTimestamp(e.startDate));           
+  /* if event seems to be exactly 24h, it's probably anniversary-like */
+  /* and we just return a single 'day-only' timestamp */    
+  if (`${parseDuration(e.duration)}` === "1 d 00:00 hh:mm") {
+      rs.push(makePlainTimestamp(e.startDate));           
+  } else {
+    /* if event is less than 24h, return full timestamp with HH:mm */
+    /* e.g., when meeting-like OR new year's eve party-like */      
+    if (checkLess24hours(e.duration)) {
+        rs.push(makeTimestampRange(e.startDate, e.endDate));
     } else {
-        if (checkLess24hours(e.duration)) {
-            rs.push(makeTimestampRange(e.startDate, e.endDate));
-        } else {
-            rs.push(makeTimestampRangeDays(e.startDate, e.endDate));
-        }}
+    /* otherwise, return 'day-only' timestamp range */
+        rs.push(makeTimestampRangeDays(e.startDate, e.endDate));
+    }}
   rs.push("\n");
   e.description ? rs.push(`\n${e.description}\n`) : null;
 }
