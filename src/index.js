@@ -12,6 +12,8 @@ const argv = require("minimist")(process.argv.slice(2));
 const RC = argv.c || `${process.env.HOME}/.icsorgrc`;
 require("dotenv").config({ path: RC });
 
+let doDebug = 0;
+
 /**
  * Display a basic usage message to the console
  * Will call process.exit to terminate the script
@@ -22,6 +24,7 @@ function doHelp() {
     "",
     "Arguments:",
     "  -a                 Author. Used for attendee matching",
+    "  -d                 Turn on debug messages",
     "  -e                 Email. Used for attendee matching",
     "  -f                 Number of days into the future to include events from. Default 365",
     "  -h | --help        Display short help message",
@@ -57,6 +60,12 @@ function doHelp() {
   process.exit(0);
 }
 
+function debug(msg) {
+  if (doDebug) {
+    console.dir(msg);
+  }
+}
+
 /**
  * Dump out script configuration settings to the console.
  * Will call process.exit to terminate the script
@@ -65,6 +74,7 @@ function doHelp() {
  */
 function dumpConfig(config) {
   let msg = [];
+  console.log("Current Config");
   for (let k in config) {
     msg.push(`${k} = ${config[k]}`);
   }
@@ -363,8 +373,13 @@ async function getIcsData(source) {
  * Main entry point for script
  */
 async function main() {
+  let DEBUG = 0;
   if (argv.h || argv.help) {
     doHelp();
+  }
+
+  if (argv.d || process.env.DEBUG) {
+    doDebug = 1;
   }
 
   try {
@@ -397,6 +412,8 @@ async function main() {
     config.START_DATE = DateTime.now().minus({ days: config.PAST });
     config.END_DATE = DateTime.now().plus({ days: config.FUTURE });
 
+    debug( `config = ${JSON.stringify(config, null, 2)}`);
+    
     if (argv.dump) {
       dumpConfig(config);
     }
