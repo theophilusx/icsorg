@@ -2,15 +2,17 @@
 
 "use strict";
 
-const fetch = require("node-fetch");
-const { Readable } = require("stream");
-const IcalExpander = require("ical-expander");
-const fs = require("fs");
-const { DateTime } = require("luxon");
-const argv = require("minimist")(process.argv.slice(2));
+import fetch from "node-fetch";
+import { Readable } from "stream";
+import IcalExpander from "ical-expander";
+import { createWriteStream, readFileSync } from "fs";
+import { DateTime } from "luxon";
+import parseArgs from "minimist";
+import dotenv from "dotenv";
 
+const argv = parseArgs(process.argv.slice(2));
 const RC = argv.c || `${process.env.HOME}/.icsorgrc`;
-require("dotenv").config({ path: RC });
+dotenv.config({ path: RC, quiet: true });
 
 let doDebug = 0;
 
@@ -325,7 +327,7 @@ function createOrgFile(config, events) {
   ];
 
   try {
-    let of = fs.createWriteStream(config.ORG_FILE, {
+    let of = createWriteStream(config.ORG_FILE, {
       encoding: "utf-8",
       flags: "w",
     });
@@ -359,7 +361,7 @@ async function getIcsData(source) {
       data = await resp.text();
     } else {
       // assume is a file name
-      data = fs.readFileSync(source, "utf-8");
+      data = readFileSync(source, "utf-8");
     }
     return data;
   } catch (err) {
@@ -373,7 +375,6 @@ async function getIcsData(source) {
  * Main entry point for script
  */
 async function main() {
-  let DEBUG = 0;
   if (argv.h || argv.help) {
     doHelp();
   }
@@ -412,9 +413,7 @@ async function main() {
     config.START_DATE = DateTime.now().minus({ days: config.PAST });
     config.END_DATE = DateTime.now().plus({ days: config.FUTURE });
 
-    debug( `config = ${JSON.stringify(config, null, 2)}`);
-    
-    if (argv.dump) {
+    if (argv.dump || debug) {
       dumpConfig(config);
     }
 
