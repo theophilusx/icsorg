@@ -1,9 +1,10 @@
 {
   "name": "icsorg",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Import ICS file into org for inclusion in org agenda",
   "main": "src/index.js",
   "bin": "src/index.js",
+  "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -24,17 +25,17 @@
   },
   "homepage": "https://github.com/theophilusx/icsorg#readme",
   "dependencies": {
-    "dotenv": "^17.2.2",
-    "ical-expander": "^3.1.0",
+    "dotenv": "^17.2.3",
+    "ical-expander": "^3.2.0",
     "luxon": "^3.7.2",
     "minimist": "^1.2.5",
-    "node-fetch": "^2.7.0"
+    "node-fetch": "^3.3.2"
   },
   "devDependencies": {
-    "chai": "^4.3.4",
-    "eslint": "^9.35.0",
+    "chai": "^6.2.0",
+    "eslint": "^9.37.0",
     "eslint-config-prettier": "^10.1.8",
-    "mocha": "^11.7.2",
+    "mocha": "^11.7.4",
     "prettier": "^3.6.2"
   }
 }
