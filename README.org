@@ -22,8 +22,8 @@ use to retrieve all your events as an =.ics= file.
 
 *Caveats*: This script has not been heavily tested and has only been run on
  Linux platforms. I wrote it to scratch my own itch, which it appears to be
- doing quite effectively. I don't run Windows, but will likely also use it on
- macOS.
+ doing quite effectively. Also notge that I'm currently using this project as a test case
+ for experimenting with LLMs and using tools like [[https://opencode.ai][OpenCode]]. 
  
 * Installation
 
@@ -59,6 +59,7 @@ option. e.g.
   
   Arguments:
     -a                 Author. Used for attendee matching
+    -d                 Turn on debug messages
     -e                 Email. Used for attendee matching
     -f                 Number of days into the future to include events from. Default 365
     -h | --help        Display short help message
@@ -164,3 +165,104 @@ a symbolic link in the global =NPM= =bin= directory. However, as cron does not
 source your profile, the script may not be in your =PATH=. There are a number of
 ways to fix this, but the easiest is to just call the script with a full
 execution path. In my case, that is =/home/tim/.npm_global/bin/icsorg=.
+
+* Debugging
+
+The script includes comprehensive debugging functionality. When you run the script
+with the =-d= flag, it will output detailed debug messages showing:
+
+- Configuration parsing and validation
+- ICS data retrieval (source, size, status)
+- Event parsing and mapping
+- File creation steps
+
+Example usage:
+
+#+begin_src shell
+  icsorg -d -i input.ics -o output.org
+#+end_src
+
+This will display debug output like:
+
+#+begin_example
+  [DEBUG] main: Debug mode enabled
+  [DEBUG] main: Starting main workflow
+  [DEBUG] parseConfig: Called with arguments
+  [DEBUG] validateConfig: Validation passed successfully
+  [DEBUG] getIcsData: Reading from file
+  [DEBUG] getIcsData: Read 1601 bytes from file
+  [DEBUG] mapEvents: Mapped 3 events
+  [DEBUG] main: Workflow completed successfully
+#+end_example
+
+The debug output is invaluable for troubleshooting issues or understanding how the
+script processes your calendar data.
+
+* Development
+
+** Code Quality
+
+The project uses modern development tools:
+
+- *ESLint* - Static code analysis and linting
+- *Prettier* - Code formatting
+- *Mocha/Chai* - Testing framework
+
+** Running Tests
+
+The project includes a comprehensive test suite with 80+ tests covering all core
+functionality:
+
+#+begin_src shell
+  # Run all tests
+  npm test
+
+  # Run only unit tests
+  npm run test:unit
+
+  # Run only integration tests
+  npm run test:integration
+
+  # Run tests in watch mode
+  npm run test:watch
+#+end_src
+
+** Code Formatting and Linting
+
+#+begin_src shell
+  # Check code formatting
+  npm run format:check
+
+  # Auto-format code
+  npm run format
+
+  # Run linter
+  npm run lint
+
+  # Auto-fix linting issues
+  npm run lint:fix
+#+end_src
+
+** Recent Improvements
+
+The project has recently undergone significant improvements:
+
+- *Bug Fixes* - Fixed critical bugs in =parseAttendee= and =parseDuration= functions
+- *Refactoring* - Extracted configuration management into separate, testable functions
+- *Validation* - Added comprehensive parameter validation with helpful error messages
+- *Testing* - Implemented 80+ tests with 100% pass rate
+- *Debugging* - Added detailed debug output for troubleshooting
+
+See the =docs/= directory for detailed technical documentation:
+
+- =improvement-plan.md= - Overview of improvements
+- =technical-spec.md= - Technical specifications
+- =test-plan.md= - Testing strategy
+- =TEST_IMPLEMENTATION_SUMMARY.md= - Test suite details
+- =TASK_3_4_SUMMARY.md= - Configuration and validation improvements
+- =DEBUG_IMPLEMENTATION_SUMMARY.md= - Debug functionality details
+
+** Contributing
+
+For developers and contributors, see =AGENTS.md= for coding standards, conventions,
+and development workflows.

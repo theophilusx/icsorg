@@ -1,4 +1,3 @@
-
 # icsorg - Import Calendar Events into Emacs Org Mode
 
 This is a very simple script to assist in importing calendar events from an ICS file into an Emacs Org mode file. Once imported, the events will show up in your Org agenda.
@@ -7,7 +6,8 @@ This work was very much inspired by the article [Google Calendar Synchronization
 
 The script does support using a URL to specify the input `.ics` file. This is useful with *Google Calendar* as that calendar includes a private URL you can use to retrieve all your events as an `.ics` file.
 
-**Caveats**: This script has not been heavily tested and has only been run on Linux platforms. I wrote it to scratch my own itch, which it appears to be doing quite effectively. I don't run Windows, but will likely also use it on macOS.
+**Caveats**: This script has not been heavily tested and has only been run on Linux platforms. I wrote it to scratch my own itch, which it appears to be doing quite effectively. Also notge that I'm currently using this project as a test case for experimenting with LLMs and using tools like [OpenCode](https://opencode.ai).
+
 
 # Installation
 
@@ -27,44 +27,48 @@ npx icsorg -h
 
 The above line will install the script and run it with the `-h` option, which will display a short help message.
 
+
 # Usage
 
 The script has a short help screen which is displayed when you use the `-h` option. e.g.
 
-    Usage: icsorg <optional arguments>
-    
-    Arguments:
-      -a                 Author. Used for attendee matching
-      -e                 Email. Used for attendee matching
-      -f                 Number of days into the future to include events from. Default 365
-      -h | --help        Display short help message
-      -c config_file     Path to configuration file
-      -i input_file      Path to the ICS file to use as input
-      -o output_file     Path to the output file to be created (org file)
-      -p days            Number of days in the past to include events from. Default 7
-      --dump             Dump the current configuration and exit
-    
-    By default, the script will look for a file called '.icsorgrc' in the
-    user's home directory. This can be overridden with the -c switch
-    Command line switches override values in the configuration file
-    
-    The configuration file consists of NAME=value lines. The file will be
-    processed using the dotenv module, which will create environment variables
-    from the values in this file. The expected values are -
-    
-      AUTHOR -   Your name. Used to identify you in meeting attendee lists
-      EMAIL  -   Your email address. Also used to identify you in attendee lists
-      ICS_FILE - Path to ICS file to use for input. This can be overridden with the -i option
-      ORG_FILE - Path to the org file to write events to. It will override any existing.
-                 It can be overridden with the -o option
-      TITLE -    The #+TITLE: header to use in the org file. Defaults to 'Calendar'
-      CATEGORY - A value for #+CATEGORY header. No default
-      STARTUP -  A value for #+STARTUP header. No default
-      FILETAGS - A value for #+FILETAGS header. No default
-      PAST -     Number of days in the past to include events from. Default 7
-      FUTURE -   Number of days into the future to include events from. Default 365
-    
-      Homepage - https://github.com/theophilusx/icsorg
+```
+Usage: icsorg <optional arguments>
+
+Arguments:
+  -a                 Author. Used for attendee matching
+  -d                 Turn on debug messages
+  -e                 Email. Used for attendee matching
+  -f                 Number of days into the future to include events from. Default 365
+  -h | --help        Display short help message
+  -c config_file     Path to configuration file
+  -i input_file      Path to the ICS file to use as input
+  -o output_file     Path to the output file to be created (org file)
+  -p days            Number of days in the past to include events from. Default 7
+  --dump             Dump the current configuration and exit
+
+By default, the script will look for a file called '.icsorgrc' in the
+user's home directory. This can be overridden with the -c switch
+Command line switches override values in the configuration file
+
+The configuration file consists of NAME=value lines. The file will be
+processed using the dotenv module, which will create environment variables
+from the values in this file. The expected values are -
+
+  AUTHOR -   Your name. Used to identify you in meeting attendee lists
+  EMAIL  -   Your email address. Also used to identify you in attendee lists
+  ICS_FILE - Path to ICS file to use for input. This can be overridden with the -i option
+  ORG_FILE - Path to the org file to write events to. It will override any existing.
+             It can be overridden with the -o option
+  TITLE -    The #+TITLE: header to use in the org file. Defaults to 'Calendar'
+  CATEGORY - A value for #+CATEGORY header. No default
+  STARTUP -  A value for #+STARTUP header. No default
+  FILETAGS - A value for #+FILETAGS header. No default
+  PAST -     Number of days in the past to include events from. Default 7
+  FUTURE -   Number of days into the future to include events from. Default 365
+
+  Homepage - https://github.com/theophilusx/icsorg
+```
 
 The script uses the `dotenv` module to read a resource file of setting used by the script. Most of these settings can be overridden with command line options. The script looks for this resource file in your home directory by default. A sample configuration file is shown below.
 
@@ -122,8 +126,113 @@ All day talk - large lunch provided. Bowling afterwards.
 Fun shopping for a new dress!
 ```
 
+
 # Workflow
 
 The basic workflow I use is to retrieve my events from my Google calendar. I use the private URL Google provides for accessing your calendar events. That URL returns an `.ics` file of all your events. The URL is used in the `.icsorgrc` configuration file for the `ICS_FILE` variable. I then have a basic cron task which runs this script every 6 hours to update my list of calendar events.
 
 Note that because this script is installed as a node module globally, it creates a symbolic link in the global `NPM` `bin` directory. However, as cron does not source your profile, the script may not be in your `PATH`. There are a number of ways to fix this, but the easiest is to just call the script with a full execution path. In my case, that is `/home/tim/.npm_global/bin/icsorg`.
+
+
+# Debugging
+
+The script includes comprehensive debugging functionality. When you run the script with the `-d` flag, it will output detailed debug messages showing:
+
+-   Configuration parsing and validation
+-   ICS data retrieval (source, size, status)
+-   Event parsing and mapping
+-   File creation steps
+
+Example usage:
+
+```shell
+icsorg -d -i input.ics -o output.org
+```
+
+This will display debug output like:
+
+```
+[DEBUG] main: Debug mode enabled
+[DEBUG] main: Starting main workflow
+[DEBUG] parseConfig: Called with arguments
+[DEBUG] validateConfig: Validation passed successfully
+[DEBUG] getIcsData: Reading from file
+[DEBUG] getIcsData: Read 1601 bytes from file
+[DEBUG] mapEvents: Mapped 3 events
+[DEBUG] main: Workflow completed successfully
+```
+
+The debug output is invaluable for troubleshooting issues or understanding how the script processes your calendar data.
+
+
+# Development
+
+
+## Code Quality
+
+The project uses modern development tools:
+
+-   **ESLint** - Static code analysis and linting
+-   **Prettier** - Code formatting
+-   **Mocha/Chai** - Testing framework
+
+
+## Running Tests
+
+The project includes a comprehensive test suite with 80+ tests covering all core functionality:
+
+```shell
+# Run all tests
+npm test
+
+# Run only unit tests
+npm run test:unit
+
+# Run only integration tests
+npm run test:integration
+
+# Run tests in watch mode
+npm run test:watch
+```
+
+
+## Code Formatting and Linting
+
+```shell
+# Check code formatting
+npm run format:check
+
+# Auto-format code
+npm run format
+
+# Run linter
+npm run lint
+
+# Auto-fix linting issues
+npm run lint:fix
+```
+
+
+## Recent Improvements
+
+The project has recently undergone significant improvements:
+
+-   **Bug Fixes** - Fixed critical bugs in `parseAttendee` and `parseDuration` functions
+-   **Refactoring** - Extracted configuration management into separate, testable functions
+-   **Validation** - Added comprehensive parameter validation with helpful error messages
+-   **Testing** - Implemented 80+ tests with 100% pass rate
+-   **Debugging** - Added detailed debug output for troubleshooting
+
+See the `docs/` directory for detailed technical documentation:
+
+-   `improvement-plan.md` - Overview of improvements
+-   `technical-spec.md` - Technical specifications
+-   `test-plan.md` - Testing strategy
+-   `TEST_IMPLEMENTATION_SUMMARY.md` - Test suite details
+-   `TASK_3_4_SUMMARY.md` - Configuration and validation improvements
+-   `DEBUG_IMPLEMENTATION_SUMMARY.md` - Debug functionality details
+
+
+## Contributing
+
+For developers and contributors, see `AGENTS.md` for coding standards, conventions, and development workflows.

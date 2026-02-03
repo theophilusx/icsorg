@@ -2,19 +2,28 @@
 
 "use strict";
 
-import fetch from "node-fetch";
 import { Readable } from "stream";
 import IcalExpander from "ical-expander";
-import { createWriteStream, readFileSync } from "fs";
-import { DateTime } from "luxon";
+import { createWriteStream } from "fs";
 import parseArgs from "minimist";
 import dotenv from "dotenv";
+import {
+  parseAttendee,
+  parseDuration,
+  makeTimestamp,
+  makeTimestampRange,
+  makeMailtoLink,
+  getPropertyValue,
+  getIcsData,
+  parseConfig,
+  validateConfig,
+  setDebugMode,
+  debug as libDebug,
+} from "./lib.js";
 
 const argv = parseArgs(process.argv.slice(2));
 const RC = argv.c || `${process.env.HOME}/.icsorgrc`;
 dotenv.config({ path: RC, quiet: true });
-
-let doDebug = 0;
 
 /**
  * Display a basic usage message to the console
@@ -62,12 +71,6 @@ function doHelp() {
   process.exit(0);
 }
 
-function debug(msg) {
-  if (doDebug) {
-    console.dir(msg);
-  }
-}
-
 /**
  * Dump out script configuration settings to the console.
  * Will call process.exit to terminate the script
@@ -82,112 +85,6 @@ function dumpConfig(config) {
   }
   console.log(msg.join("\n"));
   process.exit(0);
-}
-
-/**
- * Parse an attendee array to generate an attendee object
- *
- * @param {Array} data - Array of data about an attendee
- * @param {string} author - Author's name - used to identify 'me' attendee
- * @param {string} email - Email address - used to identify 'me' attendee
- *
- * @returns {Object} with properties for category, role, status, cn, guests and me
- */
-function parseAttendee(data, author, email) {
-  return {
-    category: data.category,
-    role: data.role,
-    status: data.partstat,
-    cn: data.cn,
-    guests: data["x-num-guests"],
-    me: data.cn === author || data.cn === email ? true : false,
-  };
-}
-
-/**
- * Parse a duration object to create a duration string
- *
- * @param {Object} d - duration object
- *
- * @returns {string}
- */
-function parseDuration(d) {
-  function pad(v) {
-    return v < 10 ? `0${v}` : `${v}`;
-  }
-
-  if (d.weeks) {
-    return `${d.weeks} wk ${d.days} d ${pad(d.hours)}:${pad(d.hours)} hh:mm`;
-  } else if (d.days) {
-    return `${d.days} d ${pad(d.hours)}:${pad(d.minutes)} hh:mm`;
-  } else {
-    return `${pad(d.hours)}:${pad(d.minutes)} hh:mm`;
-  }
-}
-
-/**
- * Make an org timestamp from a Luxon DateTime object
- *
- * @param {DateTime} dt - Luxon DateTime object
- * @param {string} type - type of timestamp. Either 'active' or 'inactive'
- *                        Defaults to 'active'
- *
- * @returns {string} org timestamp string
- */
-function makeTimestamp(dt, type = "active") {
-  let start = "<";
-  let end = ">";
-
-  if (type === "inactive") {
-    start = "[";
-    end = "]";
-  }
-  const fmt = `${start}yyyy-LL-dd ccc HH:mm${end}`;
-  if (dt) {
-    let date = DateTime.fromJSDate(dt);
-    return date.toFormat(fmt, { locale: "au" });
-  }
-  return "";
-}
-
-/**
- * Generates an org ranged (duration) timestamp string
- *
- * @param {DateTime} start - start date and time
- * @param {DateTime} end - end date and time
- *
- * @returns {string} an org timestamp string
- */
-function makeTimestampRange(start, end) {
-  const fmt = "<yyyy-LL-dd ccc HH:mm>";
-  const sDate = DateTime.fromJSDate(start);
-  const eDate = DateTime.fromJSDate(end);
-  if (sDate.hasSame(eDate, "day")) {
-    let fmt1 = "<yyyy-LL-dd ccc HH:mm-";
-    let fmt2 = "HH:mm>";
-    return `${sDate.toFormat(fmt1)}${eDate.toFormat(fmt2)}`;
-  }
-  return `${sDate.toFormat(fmt)}--${eDate.toFormat(fmt)}`;
-}
-
-/**
- * Examines the supplied value and if it looks like a mailto or email address
- * generates and org link string.
- *
- * @param {string} data - value to use.
- *
- * @returns {string} If value looks like a mailto or email address,
- *                   return an org link string, otherwise, just return
- *                   the value passed in
- */
-function makeMailtoLink(data) {
-  if (data && data.startsWith("mailto:")) {
-    let addr = data.substring(7);
-    return `[[${data}][${addr}]]`;
-  } else if (data && data.includes("@")) {
-    return `[[mailto:${data}][${data}]]`;
-  }
-  return data;
 }
 
 /**
@@ -214,38 +111,13 @@ function dumpEvent(e, rs) {
     ? rs.push(
         `:ATTENDEES:    ${e.attendees
           .map((a) => `${makeMailtoLink(a.cn)} (${a.status})`)
-          .join(", ")}`
+          .join(", ")}`,
       ) && rs.push("\n")
     : null;
   rs.push(":END:\n");
   rs.push(makeTimestampRange(e.startDate, e.endDate));
   rs.push("\n");
   e.description ? rs.push(`\n${e.description}\n`) : null;
-}
-
-/**
- * Get named property from a component
- *
- * @param {string} name - property name
- * @param {Object} component - an ICS component
- *
- * @returns {Date | string} property value
- */
-function getPropertyValue(name, component) {
-  let prop = component.getFirstProperty(name);
-  if (prop) {
-    switch (prop.getDefaultType()) {
-      case "text":
-        return prop.getFirstValue();
-      case "date-time": {
-        let val = prop.getFirstValue();
-        return val.toJSDate();
-      }
-      default:
-        return prop.getFirstValue().toString();
-    }
-  }
-  return "";
 }
 
 /**
@@ -259,7 +131,7 @@ function getPropertyValue(name, component) {
  */
 function commonEventProperties(e, author, email) {
   return {
-    attendees: e.attendees.map((a) => parseAttendee(a.jCal[1]), author, email),
+    attendees: e.attendees.map((a) => parseAttendee(a.jCal[1], author, email)),
     description: e.description,
     duration: e.duration,
     location: e.location,
@@ -282,11 +154,19 @@ function commonEventProperties(e, author, email) {
  * @returns {Array} array of event objects
  */
 function mapEvents(events, author, email) {
+  libDebug("mapEvents", "Called with parameters", {
+    eventCount: events.length,
+    author,
+    email,
+  });
+
   let mappedEvents = events.map((e) => ({
     endDate: e.endDate.toJSDate(),
     startDate: e.startDate.toJSDate(),
     ...commonEventProperties(e, author, email),
   }));
+
+  libDebug("mapEvents", `Mapped ${mappedEvents.length} events`);
   return mappedEvents;
 }
 
@@ -300,11 +180,19 @@ function mapEvents(events, author, email) {
  * @returns {Array} array of event objects
  */
 function mapOccurences(occurrences, author, email) {
+  libDebug("mapOccurences", "Called with parameters", {
+    occurrenceCount: occurrences.length,
+    author,
+    email,
+  });
+
   let mappedOccurrences = occurrences.map((o) => ({
     startDate: o.startDate.toJSDate(),
     endDate: o.endDate.toJSDate(),
     ...commonEventProperties(o.item, author, email),
   }));
+
+  libDebug("mapOccurences", `Mapped ${mappedOccurrences.length} occurrences`);
   return mappedOccurrences;
 }
 
@@ -315,6 +203,12 @@ function mapOccurences(occurrences, author, email) {
  * @param {Array} events - array of event objects
  */
 function createOrgFile(config, events) {
+  libDebug("createOrgFile", "Called with parameters", {
+    outputFile: config.ORG_FILE,
+    eventCount: events.length,
+    title: config.TITLE,
+  });
+
   const header = [
     `#+TITLE:       ${config.TITLE}\n`,
     `#+AUTHOR:      ${config.AUTHOR}\n`,
@@ -327,45 +221,26 @@ function createOrgFile(config, events) {
   ];
 
   try {
+    libDebug("createOrgFile", "Creating write stream");
     let of = createWriteStream(config.ORG_FILE, {
       encoding: "utf-8",
       flags: "w",
     });
     let rs = new Readable();
+
+    libDebug("createOrgFile", "Writing header");
     header.forEach((h) => rs.push(h));
+
+    libDebug("createOrgFile", `Writing ${events.length} events`);
     events.forEach((e) => dumpEvent(e, rs));
+
     rs.push(null);
     rs.pipe(of);
+
+    libDebug("createOrgFile", "File creation completed");
   } catch (err) {
+    libDebug("createOrgFile", "Error occurred", { error: err.message });
     throw new Error(`createOrgFile: ${err.message}`);
-  }
-}
-
-/**
- * @async
- *
- * Retrieve event data from ICS source. This could be either a local file
- * or a URL which returns an .ics file (like Google).
- *
- * @param {string} source - either path to a local file or a URL which will return an .ics file
- *
- * @returns {string} The .ics data as a string
- */
-async function getIcsData(source) {
-  let data = "";
-
-  try {
-    if (source.startsWith("http")) {
-      // assume source is a url
-      let resp = await fetch(source);
-      data = await resp.text();
-    } else {
-      // assume is a file name
-      data = readFileSync(source, "utf-8");
-    }
-    return data;
-  } catch (err) {
-    throw new Error(`getIcsData: ${err.message}`);
   }
 }
 
@@ -380,61 +255,72 @@ async function main() {
   }
 
   if (argv.d || process.env.DEBUG) {
-    doDebug = 1;
+    setDebugMode(true);
+    libDebug("main", "Debug mode enabled");
   }
 
   try {
-    const config = {
-      RC_FILE: RC,
-      ICS_FILE: argv.i || process.env.ICS_FILE,
-      ORG_FILE: argv.o || process.env.ORG_FILE,
-      TITLE: process.env.TITLE || "Calendar",
-      AUTHOR: argv.a || process.env.AUTHOR,
-      EMAIL: argv.e || process.env.EMAIL,
-      CATEGORY: process.env.CATEGORY,
-      STARTUP: process.env.STARTUP,
-      FILETAGS: process.env.FILETAGS,
-      PAST: 7,
-      FUTURE: 365,
-    };
+    libDebug("main", "Starting main workflow");
 
-    if (argv.p) {
-      config.PAST = parseInt(argv.p);
-    } else if (process.env.PAST) {
-      config.PAST = parseInt(process.env.PAST);
-    }
+    const config = parseConfig(argv, RC);
+    validateConfig(config);
 
-    if (argv.f) {
-      config.FUTURE = parseInt(argv.f);
-    } else if (process.env.FUTURE) {
-      config.FUTURE = parseInt(process.env.FUTURE);
-    }
-
-    config.START_DATE = DateTime.now().minus({ days: config.PAST });
-    config.END_DATE = DateTime.now().plus({ days: config.FUTURE });
-
-    if (argv.dump || debug) {
+    if (argv.dump) {
       dumpConfig(config);
     }
 
+    libDebug("main", "Fetching ICS data", { source: config.ICS_FILE });
     let data = await getIcsData(config.ICS_FILE);
+
+    libDebug("main", "Parsing ICS data with expander", {
+      dataLength: data.length,
+      maxIterations: 1000,
+    });
     const expander = new IcalExpander({ ics: data, maxIterations: 1000 });
+
+    libDebug("main", "Extracting events between dates", {
+      startDate: config.START_DATE.toISO(),
+      endDate: config.END_DATE.toISO(),
+    });
     const events = expander.between(
       config.START_DATE.toJSDate(),
-      config.END_DATE.toJSDate()
+      config.END_DATE.toJSDate(),
     );
+
+    libDebug("main", "Events extracted", {
+      eventCount: events.events.length,
+      occurrenceCount: events.occurrences.length,
+    });
+
+    libDebug("main", "Mapping events", {
+      author: config.AUTHOR,
+      email: config.EMAIL,
+    });
     const mappedEvents = mapEvents(events.events, config.AUTHOR, config.EMAIL);
+
+    libDebug("main", "Mapping occurrences");
     const mappedOccurrences = mapOccurences(
       events.occurrences,
       config.AUTHOR,
-      config.EMAIL
+      config.EMAIL,
     );
+
     let allEvents = [...mappedEvents, ...mappedOccurrences];
+    libDebug("main", "Total events to write", {
+      totalEvents: allEvents.length,
+      mappedEvents: mappedEvents.length,
+      mappedOccurrences: mappedOccurrences.length,
+    });
+
+    libDebug("main", "Creating org file", { outputFile: config.ORG_FILE });
     createOrgFile(config, allEvents);
+
+    libDebug("main", "Workflow completed successfully");
     console.log(
-      `Generated new org file in ${config.ORG_FILE} with ${allEvents.length} entries`
+      `Generated new org file in ${config.ORG_FILE} with ${allEvents.length} entries`,
     );
   } catch (err) {
+    libDebug("main", "Error occurred in main workflow", { error: err.message });
     throw new Error(`main: ${err.message}`);
   }
 }
