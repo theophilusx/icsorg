@@ -10,8 +10,11 @@ describe("parseConfig", () => {
   });
 
   afterEach(() => {
-    // Restore original env vars
-    process.env = originalEnv;
+    // Restore original env vars by key-level delete/restore
+    Object.keys(process.env).forEach((k) => {
+      if (!(k in originalEnv)) delete process.env[k];
+    });
+    Object.assign(process.env, originalEnv);
   });
 
   it("should parse config with command line arguments", () => {
@@ -115,6 +118,23 @@ describe("parseConfig", () => {
     expect(config.CATEGORY).to.equal("EVENTS");
     expect(config.STARTUP).to.equal("overview");
     expect(config.FILETAGS).to.equal(":calendar:");
+  });
+
+  it("should default optional string fields to empty string when not set", () => {
+    delete process.env.AUTHOR;
+    delete process.env.EMAIL;
+    delete process.env.CATEGORY;
+    delete process.env.STARTUP;
+    delete process.env.FILETAGS;
+
+    const argv = { i: "input.ics", o: "output.org" };
+    const config = parseConfig(argv, "/home/user/.icsorgrc");
+
+    expect(config.AUTHOR).to.equal("");
+    expect(config.EMAIL).to.equal("");
+    expect(config.CATEGORY).to.equal("");
+    expect(config.STARTUP).to.equal("");
+    expect(config.FILETAGS).to.equal("");
   });
 
   it("should parse string numbers to integers for PAST", () => {

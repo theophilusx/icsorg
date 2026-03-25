@@ -84,11 +84,13 @@ describe("makeMailtoLink", () => {
     );
   });
 
-  it("should handle string with @ but not an email", () => {
+  it("known limitation: any string containing @ produces a mailto link", () => {
     const input = "Check @ symbol";
     const result = makeMailtoLink(input);
 
-    // Should still create a link because it contains @
+    // Known limitation: the function only checks for presence of "@" without
+    // validating email format, so non-email strings with "@" become invalid
+    // mailto links. Fix would require proper email format validation.
     expect(result).to.equal("[[mailto:Check @ symbol][Check @ symbol]]");
   });
 });

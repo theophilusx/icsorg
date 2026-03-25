@@ -1,23 +1,16 @@
 #!/usr/bin/env node
 
-"use strict";
-
-import { Readable } from "stream";
 import IcalExpander from "ical-expander";
-import { createWriteStream } from "fs";
 import parseArgs from "minimist";
 import dotenv from "dotenv";
 import {
   parseAttendee,
-  parseDuration,
-  makeTimestamp,
-  makeTimestampRange,
-  makeMailtoLink,
   getPropertyValue,
   getIcsData,
   parseConfig,
   validateConfig,
   setDebugMode,
+  createOrgFile,
   debug as libDebug,
 } from "./lib.js";
 
@@ -88,39 +81,6 @@ function dumpConfig(config) {
 }
 
 /**
- * dumps out an event to the specified read stream
- *
- * @param {Object} e - event object
- * @param {stream} rs - stream to push data onto
- */
-function dumpEvent(e, rs) {
-  rs.push(`* ${e.summary}\n`);
-  rs.push(":PROPERTIES:\n");
-  rs.push(":ICAL_EVENT:    t\n");
-  rs.push(`:ID:            ${e.uid}\n`);
-  e.organizer
-    ? rs.push(`:ORGANIZER:     ${makeMailtoLink(e.organizer)}\n`)
-    : null;
-  e.status ? rs.push(`:STATUS:        ${e.status}\n`) : null;
-  e.modified
-    ? rs.push(`:LAST_MODIFIED: ${makeTimestamp(e.modified, "inactive")}\n`)
-    : null;
-  e.location ? rs.push(`:LOCATION:      ${e.location}\n`) : null;
-  e.duration ? rs.push(`:DURATION:      ${parseDuration(e.duration)}\n`) : null;
-  e.attendees.length
-    ? rs.push(
-        `:ATTENDEES:    ${e.attendees
-          .map((a) => `${makeMailtoLink(a.cn)} (${a.status})`)
-          .join(", ")}`,
-      ) && rs.push("\n")
-    : null;
-  rs.push(":END:\n");
-  rs.push(makeTimestampRange(e.startDate, e.endDate));
-  rs.push("\n");
-  e.description ? rs.push(`\n${e.description}\n`) : null;
-}
-
-/**
  * Extract common properties from event and occurrence components
  *
  * @param {Object} e - an event component
@@ -179,8 +139,8 @@ function mapEvents(events, author, email) {
  *
  * @returns {Array} array of event objects
  */
-function mapOccurences(occurrences, author, email) {
-  libDebug("mapOccurences", "Called with parameters", {
+function mapOccurrences(occurrences, author, email) {
+  libDebug("mapOccurrences", "Called with parameters", {
     occurrenceCount: occurrences.length,
     author,
     email,
@@ -192,56 +152,8 @@ function mapOccurences(occurrences, author, email) {
     ...commonEventProperties(o.item, author, email),
   }));
 
-  libDebug("mapOccurences", `Mapped ${mappedOccurrences.length} occurrences`);
+  libDebug("mapOccurrences", `Mapped ${mappedOccurrences.length} occurrences`);
   return mappedOccurrences;
-}
-
-/**
- * Create new org file from list of events
- *
- * @param {Object} config - configuration settings
- * @param {Array} events - array of event objects
- */
-function createOrgFile(config, events) {
-  libDebug("createOrgFile", "Called with parameters", {
-    outputFile: config.ORG_FILE,
-    eventCount: events.length,
-    title: config.TITLE,
-  });
-
-  const header = [
-    `#+TITLE:       ${config.TITLE}\n`,
-    `#+AUTHOR:      ${config.AUTHOR}\n`,
-    `#+EMAIL:       ${config.EMAIL}\n`,
-    "#+DESCRIPTION: converted using icsorg node script\n",
-    `#+CATEGORY:    ${config.CATEGORY}\n`,
-    `#+STARTUP:     ${config.STARTUP}\n`,
-    `#+FILETAGS:    ${config.FILETAGS}\n`,
-    "\n",
-  ];
-
-  try {
-    libDebug("createOrgFile", "Creating write stream");
-    let of = createWriteStream(config.ORG_FILE, {
-      encoding: "utf-8",
-      flags: "w",
-    });
-    let rs = new Readable();
-
-    libDebug("createOrgFile", "Writing header");
-    header.forEach((h) => rs.push(h));
-
-    libDebug("createOrgFile", `Writing ${events.length} events`);
-    events.forEach((e) => dumpEvent(e, rs));
-
-    rs.push(null);
-    rs.pipe(of);
-
-    libDebug("createOrgFile", "File creation completed");
-  } catch (err) {
-    libDebug("createOrgFile", "Error occurred", { error: err.message });
-    throw new Error(`createOrgFile: ${err.message}`);
-  }
 }
 
 /**
@@ -299,7 +211,7 @@ async function main() {
     const mappedEvents = mapEvents(events.events, config.AUTHOR, config.EMAIL);
 
     libDebug("main", "Mapping occurrences");
-    const mappedOccurrences = mapOccurences(
+    const mappedOccurrences = mapOccurrences(
       events.occurrences,
       config.AUTHOR,
       config.EMAIL,
@@ -313,7 +225,7 @@ async function main() {
     });
 
     libDebug("main", "Creating org file", { outputFile: config.ORG_FILE });
-    createOrgFile(config, allEvents);
+    await createOrgFile(config, allEvents);
 
     libDebug("main", "Workflow completed successfully");
     console.log(

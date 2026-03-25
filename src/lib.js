@@ -3,7 +3,9 @@
  */
 
 import fetch from "node-fetch";
-import { readFileSync } from "fs";
+import { createWriteStream } from "fs";
+import { readFile } from "fs/promises";
+import { Readable } from "stream";
 import { DateTime } from "luxon";
 
 // Debug state - set from index.js
@@ -28,7 +30,7 @@ export function setDebugMode(enabled) {
 export function debug(functionName, message, data) {
   if (debugEnabled) {
     console.log(`[DEBUG] ${functionName}: ${message}`);
-    if (data !== undefined) {
+    if (data != null) {
       console.dir(data, { depth: null, colors: true });
     }
   }
@@ -50,11 +52,11 @@ export function parseConfig(argv, rcFile) {
     ICS_FILE: argv.i || process.env.ICS_FILE,
     ORG_FILE: argv.o || process.env.ORG_FILE,
     TITLE: process.env.TITLE || "Calendar",
-    AUTHOR: argv.a || process.env.AUTHOR,
-    EMAIL: argv.e || process.env.EMAIL,
-    CATEGORY: process.env.CATEGORY,
-    STARTUP: process.env.STARTUP,
-    FILETAGS: process.env.FILETAGS,
+    AUTHOR: argv.a || process.env.AUTHOR || "",
+    EMAIL: argv.e || process.env.EMAIL || "",
+    CATEGORY: process.env.CATEGORY || "",
+    STARTUP: process.env.STARTUP || "",
+    FILETAGS: process.env.FILETAGS || "",
     PAST: 7,
     FUTURE: 365,
   };
@@ -285,6 +287,97 @@ export function getPropertyValue(name, component) {
 }
 
 /**
+ * Dump an event to the specified readable stream
+ *
+ * @param {Object} e - event object
+ * @param {stream.Readable} rs - stream to push data onto
+ */
+export function dumpEvent(e, rs) {
+  rs.push(`* ${e.summary}\n`);
+  rs.push(":PROPERTIES:\n");
+  rs.push(":ICAL_EVENT:    t\n");
+  rs.push(`:ID:            ${e.uid}\n`);
+  if (e.organizer) rs.push(`:ORGANIZER:     ${makeMailtoLink(e.organizer)}\n`);
+  if (e.status) rs.push(`:STATUS:        ${e.status}\n`);
+  if (e.modified)
+    rs.push(`:LAST_MODIFIED: ${makeTimestamp(e.modified, "inactive")}\n`);
+  if (e.location) rs.push(`:LOCATION:      ${e.location}\n`);
+  if (e.duration) rs.push(`:DURATION:      ${parseDuration(e.duration)}\n`);
+  if (e.attendees.length) {
+    rs.push(
+      `:ATTENDEES:    ${e.attendees
+        .map((a) => `${makeMailtoLink(a.cn)} (${a.status})`)
+        .join(", ")}`,
+    );
+    rs.push("\n");
+  }
+  rs.push(":END:\n");
+  rs.push(makeTimestampRange(e.startDate, e.endDate));
+  rs.push("\n");
+  if (e.description) rs.push(`\n${e.description}\n`);
+}
+
+/**
+ * Create new org file from list of events
+ *
+ * @param {Object} config - configuration settings
+ * @param {Array} events - array of event objects
+ *
+ * @returns {Promise<void>} resolves when file is fully written, rejects on error
+ */
+export function createOrgFile(config, events) {
+  debug("createOrgFile", "Called with parameters", {
+    outputFile: config.ORG_FILE,
+    eventCount: events.length,
+    title: config.TITLE,
+  });
+
+  const header = [
+    `#+TITLE:       ${config.TITLE}\n`,
+    `#+AUTHOR:      ${config.AUTHOR}\n`,
+    `#+EMAIL:       ${config.EMAIL}\n`,
+    "#+DESCRIPTION: converted using icsorg node script\n",
+    `#+CATEGORY:    ${config.CATEGORY}\n`,
+    `#+STARTUP:     ${config.STARTUP}\n`,
+    `#+FILETAGS:    ${config.FILETAGS}\n`,
+    "\n",
+  ];
+
+  return new Promise((resolve, reject) => {
+    try {
+      debug("createOrgFile", "Creating write stream");
+      const of = createWriteStream(config.ORG_FILE, {
+        encoding: "utf-8",
+        flags: "w",
+      });
+      const rs = new Readable({ read() {} });
+
+      of.on("error", (err) => {
+        debug("createOrgFile", "Write stream error", { error: err.message });
+        reject(new Error(`createOrgFile: ${err.message}`));
+      });
+
+      of.on("finish", () => {
+        debug("createOrgFile", "File creation completed");
+        resolve();
+      });
+
+      debug("createOrgFile", "Writing header");
+      header.forEach((h) => rs.push(h));
+
+      debug("createOrgFile", `Writing ${events.length} events`);
+      events.forEach((e) => dumpEvent(e, rs));
+
+      rs.push(null);
+      rs.pipe(of);
+    } catch (err) {
+      debug("createOrgFile", "Error occurred", { error: err.message });
+      reject(new Error(`createOrgFile: ${err.message}`));
+    }
+  });
+}
+
+/**
  * @async
  *
  * Retrieve event data from ICS source. This could be either a local file
@@ -297,23 +390,23 @@ export function getPropertyValue(name, component) {
 export async function getIcsData(source) {
   debug("getIcsData", "Called with source", { source });
 
-  let data = "";
-
   try {
+    let data;
     if (source.startsWith("http")) {
-      // assume source is a url
       debug("getIcsData", "Fetching from URL");
-      let resp = await fetch(source);
+      const resp = await fetch(source);
       debug("getIcsData", "Fetch response received", {
         status: resp.status,
         statusText: resp.statusText,
       });
+      if (!resp.ok) {
+        throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
+      }
       data = await resp.text();
       debug("getIcsData", `Retrieved ${data.length} bytes from URL`);
     } else {
-      // assume is a file name
       debug("getIcsData", "Reading from file");
-      data = readFileSync(source, "utf-8");
+      data = await readFile(source, "utf-8");
       debug("getIcsData", `Read ${data.length} bytes from file`);
     }
 

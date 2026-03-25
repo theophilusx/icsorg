@@ -8,24 +8,24 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 describe("getIcsData (Integration)", () => {
-  it("should read ICS data from local file", async () => {
-    const fixturePath = join(__dirname, "..", "fixtures", "sample.ics");
-    const result = await getIcsData(fixturePath);
+  const fixturePath = join(__dirname, "..", "fixtures", "sample.ics");
+  let fixtureContents;
 
-    expect(result).to.be.a("string");
-    expect(result).to.include("BEGIN:VCALENDAR");
-    expect(result).to.include("END:VCALENDAR");
-    expect(result).to.include("Test Meeting");
+  before(async () => {
+    fixtureContents = await getIcsData(fixturePath);
   });
 
-  it("should return complete ICS file content", async () => {
-    const fixturePath = join(__dirname, "..", "fixtures", "sample.ics");
-    const result = await getIcsData(fixturePath);
+  it("should read ICS data from local file", () => {
+    expect(fixtureContents).to.be.a("string");
+    expect(fixtureContents).to.include("BEGIN:VCALENDAR");
+    expect(fixtureContents).to.include("END:VCALENDAR");
+    expect(fixtureContents).to.include("Test Meeting");
+  });
 
-    // Should contain all three test events
-    expect(result).to.include("test-event-1@example.com");
-    expect(result).to.include("test-event-2@example.com");
-    expect(result).to.include("test-event-3@example.com");
+  it("should return complete ICS file content", () => {
+    expect(fixtureContents).to.include("test-event-1@example.com");
+    expect(fixtureContents).to.include("test-event-2@example.com");
+    expect(fixtureContents).to.include("test-event-3@example.com");
   });
 
   it("should throw error for non-existent file", async () => {
@@ -44,43 +44,50 @@ describe("getIcsData (Integration)", () => {
     }
   });
 
-  it("should parse file with correct encoding", async () => {
-    const fixturePath = join(__dirname, "..", "fixtures", "sample.ics");
-    const result = await getIcsData(fixturePath);
+  it("should return identical content to direct file read", () => {
     const directRead = readFileSync(fixturePath, "utf-8");
-
-    expect(result).to.equal(directRead);
+    expect(fixtureContents).to.equal(directRead);
   });
 
-  it("should handle file with event descriptions", async () => {
-    const fixturePath = join(__dirname, "..", "fixtures", "sample.ics");
-    const result = await getIcsData(fixturePath);
-
-    expect(result).to.include(
+  it("should handle file with event descriptions", () => {
+    expect(fixtureContents).to.include(
       "DESCRIPTION:This is a test event for unit testing",
     );
-    expect(result).to.include("DESCRIPTION:Another test event");
+    expect(fixtureContents).to.include("DESCRIPTION:Another test event");
   });
 
-  it("should handle file with attendees", async () => {
-    const fixturePath = join(__dirname, "..", "fixtures", "sample.ics");
-    const result = await getIcsData(fixturePath);
+  it("should throw error with HTTP status for non-2xx response", async () => {
+    const { createServer } = await import("http");
+    const server = createServer((_req, res) => {
+      res.writeHead(404, { "Content-Type": "text/plain" });
+      res.end("Not Found");
+    });
 
-    expect(result).to.include("ATTENDEE");
-    expect(result).to.include("john.doe@example.com");
-    expect(result).to.include("jane.smith@example.com");
+    await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address();
+
+    try {
+      await getIcsData(`http://127.0.0.1:${port}/calendar.ics`);
+      expect.fail("Should have thrown an error");
+    } catch (err) {
+      expect(err.message).to.include("HTTP 404");
+    } finally {
+      await new Promise((resolve) => server.close(resolve));
+    }
   });
 
-  it("should preserve all ICS properties", async () => {
-    const fixturePath = join(__dirname, "..", "fixtures", "sample.ics");
-    const result = await getIcsData(fixturePath);
+  it("should handle file with attendees", () => {
+    expect(fixtureContents).to.include("ATTENDEE");
+    expect(fixtureContents).to.include("john.doe@example.com");
+    expect(fixtureContents).to.include("jane.smith@example.com");
+  });
 
-    // Check for important ICS properties
-    expect(result).to.include("DTSTART");
-    expect(result).to.include("DTEND");
-    expect(result).to.include("SUMMARY");
-    expect(result).to.include("LOCATION");
-    expect(result).to.include("ORGANIZER");
-    expect(result).to.include("STATUS");
+  it("should preserve all ICS properties", () => {
+    expect(fixtureContents).to.include("DTSTART");
+    expect(fixtureContents).to.include("DTEND");
+    expect(fixtureContents).to.include("SUMMARY");
+    expect(fixtureContents).to.include("LOCATION");
+    expect(fixtureContents).to.include("ORGANIZER");
+    expect(fixtureContents).to.include("STATUS");
   });
 });
