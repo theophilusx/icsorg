@@ -6,7 +6,7 @@ This guide provides coding standards and workflows for AI agents working on the 
 
 - **Language:** JavaScript (ES6+, ES Modules)
 - **Runtime:** Node.js v14+ (no TypeScript)
-- **Architecture:** Single-file CLI application (src/index.js)
+- **Architecture:** CLI entry point (`src/index.js`) + testable library (`src/lib.js`)
 - **Purpose:** Convert ICS calendar files/URLs → Org-mode files for Emacs agenda
 
 ## Build, Lint & Test Commands
@@ -34,14 +34,26 @@ npx prettier --write src/
 ### Testing
 
 ```bash
-# No tests implemented yet
-npm test  # Currently exits with error
+# Run all tests (unit + integration)
+npm test
 
-# Test frameworks installed: mocha + chai
-# To run tests (once implemented):
-npx mocha test/**/*.test.js
-npx mocha test/specific-test.test.js  # Run single test
+# Run only unit tests
+npm run test:unit
+
+# Run only integration tests
+npm run test:integration
+
+# Run a specific test file
+npx mocha test/unit/parseConfig.test.js
+
+# Watch mode
+npm run test:watch
 ```
+
+Tests are located in:
+- `test/unit/` - Unit tests for individual functions in `src/lib.js`
+- `test/integration/` - Integration tests (e.g., real file I/O, HTTP)
+- `test/fixtures/` - Sample `.ics` files used by integration tests
 
 ### Running the Application
 
@@ -110,9 +122,8 @@ import dotenv from "dotenv";
 
 **Exports:**
 
-- This is a CLI script with no module exports
-- For future modules, use named exports for utilities
-- Default export for main class/function
+- `src/lib.js` exports all utility functions as named exports
+- `src/index.js` has no exports — it is a CLI entry point only
 
 ### Naming Conventions
 
@@ -254,16 +265,10 @@ attendees.map((a) => `${makeMailtoLink(a.cn)} (${a.status})`);
 
 ### Stream-Based I/O
 
+`createOrgFile` in `src/lib.js` uses Node.js streams and returns a Promise that resolves on the `'finish'` event and rejects on `'error'`. Always `await` it.
+
 ```javascript
-const of = createWriteStream(config.ORG_FILE, {
-  encoding: "utf-8",
-  flags: "w",
-});
-const rs = new Readable();
-header.forEach((h) => rs.push(h));
-events.forEach((e) => dumpEvent(e, rs));
-rs.push(null); // Signal end of stream
-rs.pipe(of); // Pipe to file
+await createOrgFile(config, allEvents);
 ```
 
 ## Configuration Management
@@ -293,7 +298,7 @@ const config = {
 
 - `eslint` + `eslint-config-prettier` - Linting
 - `prettier` - Code formatting
-- `mocha` + `chai` - Testing (not yet implemented)
+- `mocha` + `chai` - Testing
 
 ## Git Workflow
 
@@ -303,12 +308,12 @@ const config = {
 
 ## Key Architectural Notes
 
-1. **Single-file application** (src/index.js) - keep it cohesive
+1. **Two-module design** - `src/index.js` is the CLI entry point; `src/lib.js` contains all testable pure/async functions
 2. **No TypeScript** - use JSDoc for type documentation
 3. **CLI-first design** - console output is expected (`no-console: 0`)
 4. **Emacs integration** - output must be valid Org-mode syntax
-5. **Stream processing** - efficient for large calendar files
-6. **No tests yet** - test infrastructure present but not implemented
+5. **Stream processing** - `createOrgFile` uses Node.js streams and returns a Promise
+6. **87 tests** - unit tests cover all lib.js exports; integration tests cover file I/O and HTTP
 
 ## Documentation Files
 
