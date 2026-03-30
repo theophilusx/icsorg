@@ -3,3 +3,9 @@
 .log
 .icsorgrc
 test
+.claude
+calendar.org
+docs
+eslint.config.js
+org-to-gfm.sh
+AGENTS.md
