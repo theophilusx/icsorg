@@ -1,38 +1,60 @@
 # icsorg - Import Calendar Events into Emacs Org Mode
 
-This is a very simple script to assist in importing calendar events from an ICS file into an Emacs Org mode file. Once imported, the events will show up in your Org agenda.
+This is a very simple script to assist in importing calendar events from
+an ICS file into an Emacs Org mode file. Once imported, the events will
+show up in your Org agenda.
 
-This work was very much inspired by the article [Google Calendar Synchronization](https://orgmode.org/worg/org-tutorials/org-google-sync.html). This script fulfils a role similar to the `ics2org` Awk script referenced in that article. Essentially, `icsorg` will read data from an `.ics` file, parse it to extract all the events and generate an entry in an `Emacs Org mode` file for each event. Provided the output file is included in the list of files scanned by org to generate the agenda, these events will show up as entries in the agenda. This script does not do any upstream synchronisation - it does not push events back out to a remote service like *Google* or *Office 365*.
+This work was very much inspired by the article [Google Calendar
+Synchronization](https://orgmode.org/worg/org-tutorials/org-google-sync.html).
+This script fulfils a role similar to the `ics2org` Awk script
+referenced in that article. Essentially, `icsorg` will read data from an
+`.ics` file, parse it to extract all the events and generate an entry in
+an `Emacs Org
+mode` file for each event. Provided the output file is included in the
+list of files scanned by org to generate the agenda, these events will
+show up as entries in the agenda. This script does not do any upstream
+synchronisation - it does not push events back out to a remote service
+like *Google* or *Office 365*.
 
-The script does support using a URL to specify the input `.ics` file. This is useful with *Google Calendar* as that calendar includes a private URL you can use to retrieve all your events as an `.ics` file.
+The script does support using a URL to specify the input `.ics` file.
+This is useful with *Google Calendar* as that calendar includes a
+private URL you can use to retrieve all your events as an `.ics` file.
 
-**Caveats**: This script has not been heavily tested and has only been run on Linux platforms. I wrote it to scratch my own itch, which it appears to be doing quite effectively. Also notge that I'm currently using this project as a test case for experimenting with LLMs and using tools like [OpenCode](https://opencode.ai).
-
+**Caveats**: This script has not been heavily tested and has only been
+run on Linux platforms. I wrote it to scratch my own itch, which it
+appears to be doing quite effectively. Also note that I'm currently
+using this project as a test case for experimenting with LLMs and using
+tools like [OpenCode](https://opencode.ai).
 
 # Installation
 
-A prerequisite for running this script is `node* and *npm*. It is recommended to have at least =node` v14.x.x, but the script should work with `node` 12.x.x. It is recommended you install the script globally as this will ensure it is placed in the `bin` directory used by globally installed modules, which is normally on your execution `PATH`.
+A prerequisite for running this script is `node` and `npm`. Node.js v18
+or later is required. It is recommended you install the script globally
+as this will ensure it is placed in the `bin` directory used by globally
+installed modules, which is normally on your execution `PATH`.
 
 Install the script either by running
 
-```shell
+``` shell
 npm i -g icsorg
 ```
 
-Alternatively, you can use the `npx` command to both install and run the script. e.g.
+Alternatively, you can use the `npx` command to both install and run the
+script. e.g.
 
-```shell
+``` shell
 npx icsorg -h
 ```
 
-The above line will install the script and run it with the `-h` option, which will display a short help message.
-
+The above line will install the script and run it with the `-h` option,
+which will display a short help message.
 
 # Usage
 
-The script has a short help screen which is displayed when you use the `-h` option. e.g.
+The script has a short help screen which is displayed when you use the
+`-h` option. e.g.
 
-```
+``` example
 Usage: icsorg <optional arguments>
 
 Arguments:
@@ -70,9 +92,12 @@ from the values in this file. The expected values are -
   Homepage - https://github.com/theophilusx/icsorg
 ```
 
-The script uses the `dotenv` module to read a resource file of setting used by the script. Most of these settings can be overridden with command line options. The script looks for this resource file in your home directory by default. A sample configuration file is shown below.
+The script uses the `dotenv` module to read a resource file of setting
+used by the script. Most of these settings can be overridden with
+command line options. The script looks for this resource file in your
+home directory by default. A sample configuration file is shown below.
 
-```config
+``` config
 AUTHOR="Fred Flintstone" # Your name - used to match attendees for an event
 EMAIL=fred@bedrock.com   # Your email address - also used for attendee matching
 ICS_FILE=/home/fred/google.ics # location of the ics file to use as input
@@ -85,9 +110,10 @@ PAST=30 # how many days into the past to look for events
 FUTURE=365 # how many days into the future to look for events
 ```
 
-The script, using the above settings, would generate an org file of events. A partial sample output is below.
+The script, using the above settings, would generate an org file of
+events. A partial sample output is below.
 
-```org
+``` org
 #+TITLE:       Google Calendar
 #+AUTHOR:      Fred Flintstone
 #+EMAIL:       fred@bedrock.comm
@@ -126,32 +152,42 @@ All day talk - large lunch provided. Bowling afterwards.
 Fun shopping for a new dress!
 ```
 
-
 # Workflow
 
-The basic workflow I use is to retrieve my events from my Google calendar. I use the private URL Google provides for accessing your calendar events. That URL returns an `.ics` file of all your events. The URL is used in the `.icsorgrc` configuration file for the `ICS_FILE` variable. I then have a basic cron task which runs this script every 6 hours to update my list of calendar events.
+The basic workflow I use is to retrieve my events from my Google
+calendar. I use the private URL Google provides for accessing your
+calendar events. That URL returns an `.ics` file of all your events. The
+URL is used in the `.icsorgrc` configuration file for the `ICS_FILE`
+variable. I then have a basic cron task which runs this script every 6
+hours to update my list of calendar events.
 
-Note that because this script is installed as a node module globally, it creates a symbolic link in the global `NPM` `bin` directory. However, as cron does not source your profile, the script may not be in your `PATH`. There are a number of ways to fix this, but the easiest is to just call the script with a full execution path. In my case, that is `/home/tim/.npm_global/bin/icsorg`.
-
+Note that because this script is installed as a node module globally, it
+creates a symbolic link in the global `NPM` `bin` directory. However, as
+cron does not source your profile, the script may not be in your `PATH`.
+There are a number of ways to fix this, but the easiest is to just call
+the script with a full execution path. In my case, that is
+`/home/tim/.npm_global/bin/icsorg`.
 
 # Debugging
 
-The script includes comprehensive debugging functionality. When you run the script with the `-d` flag, it will output detailed debug messages showing:
+The script includes comprehensive debugging functionality. When you run
+the script with the `-d` flag, it will output detailed debug messages
+showing:
 
--   Configuration parsing and validation
--   ICS data retrieval (source, size, status)
--   Event parsing and mapping
--   File creation steps
+- Configuration parsing and validation
+- ICS data retrieval (source, size, status)
+- Event parsing and mapping
+- File creation steps
 
 Example usage:
 
-```shell
+``` shell
 icsorg -d -i input.ics -o output.org
 ```
 
 This will display debug output like:
 
-```
+``` example
 [DEBUG] main: Debug mode enabled
 [DEBUG] main: Starting main workflow
 [DEBUG] parseConfig: Called with arguments
@@ -162,26 +198,25 @@ This will display debug output like:
 [DEBUG] main: Workflow completed successfully
 ```
 
-The debug output is invaluable for troubleshooting issues or understanding how the script processes your calendar data.
-
+The debug output is invaluable for troubleshooting issues or
+understanding how the script processes your calendar data.
 
 # Development
-
 
 ## Code Quality
 
 The project uses modern development tools:
 
--   **ESLint** - Static code analysis and linting
--   **Prettier** - Code formatting
--   **Mocha/Chai** - Testing framework
-
+- **ESLint** - Static code analysis and linting
+- **Prettier** - Code formatting
+- **Mocha/Chai** - Testing framework
 
 ## Running Tests
 
-The project includes a comprehensive test suite with 80+ tests covering all core functionality:
+The project includes a comprehensive test suite with 80+ tests covering
+all core functionality:
 
-```shell
+``` shell
 # Run all tests
 npm test
 
@@ -195,10 +230,9 @@ npm run test:integration
 npm run test:watch
 ```
 
-
 ## Code Formatting and Linting
 
-```shell
+``` shell
 # Check code formatting
 npm run format:check
 
@@ -212,27 +246,18 @@ npm run lint
 npm run lint:fix
 ```
 
+## Changelog
 
-## Recent Improvements
-
-The project has recently undergone significant improvements:
-
--   **Bug Fixes** - Fixed critical bugs in `parseAttendee` and `parseDuration` functions
--   **Refactoring** - Extracted configuration management into separate, testable functions
--   **Validation** - Added comprehensive parameter validation with helpful error messages
--   **Testing** - Implemented 80+ tests with 100% pass rate
--   **Debugging** - Added detailed debug output for troubleshooting
+See the [releases page](https://github.com/theophilusx/icsorg/releases)
+for a changelog.
 
 See the `docs/` directory for detailed technical documentation:
 
--   `improvement-plan.md` - Overview of improvements
--   `technical-spec.md` - Technical specifications
--   `test-plan.md` - Testing strategy
--   `TEST_IMPLEMENTATION_SUMMARY.md` - Test suite details
--   `TASK_3_4_SUMMARY.md` - Configuration and validation improvements
--   `DEBUG_IMPLEMENTATION_SUMMARY.md` - Debug functionality details
-
+- `improvement-plan.md` - Overview of improvements
+- `technical-spec.md` - Technical specifications
+- `test-plan.md` - Testing strategy
 
 ## Contributing
 
-For developers and contributors, see `AGENTS.md` for coding standards, conventions, and development workflows.
+For developers and contributors, see `AGENTS.md` for coding standards,
+conventions, and development workflows.

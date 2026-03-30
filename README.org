@@ -22,13 +22,13 @@ use to retrieve all your events as an =.ics= file.
 
 *Caveats*: This script has not been heavily tested and has only been run on
  Linux platforms. I wrote it to scratch my own itch, which it appears to be
- doing quite effectively. Also notge that I'm currently using this project as a test case
+ doing quite effectively. Also note that I'm currently using this project as a test case
  for experimenting with LLMs and using tools like [[https://opencode.ai][OpenCode]]. 
  
 * Installation
 
-A prerequisite for running this script is =node* and *npm*. It is recommended to
-have at least =node= v14.x.x, but the script should work with =node= 12.x.x.
+A prerequisite for running this script is =node= and =npm=. Node.js v18 or later
+is required.
 It is recommended you install the script globally as this will ensure it is
 placed in the =bin= directory used by globally installed modules, which is
 normally on your execution =PATH=.
@@ -243,24 +243,15 @@ functionality:
   npm run lint:fix
 #+end_src
 
-** Recent Improvements
+** Changelog
 
-The project has recently undergone significant improvements:
-
-- *Bug Fixes* - Fixed critical bugs in =parseAttendee= and =parseDuration= functions
-- *Refactoring* - Extracted configuration management into separate, testable functions
-- *Validation* - Added comprehensive parameter validation with helpful error messages
-- *Testing* - Implemented 80+ tests with 100% pass rate
-- *Debugging* - Added detailed debug output for troubleshooting
+See the [[https://github.com/theophilusx/icsorg/releases][releases page]] for a changelog.
 
 See the =docs/= directory for detailed technical documentation:
 
 - =improvement-plan.md= - Overview of improvements
 - =technical-spec.md= - Technical specifications
 - =test-plan.md= - Testing strategy
-- =TEST_IMPLEMENTATION_SUMMARY.md= - Test suite details
-- =TASK_3_4_SUMMARY.md= - Configuration and validation improvements
-- =DEBUG_IMPLEMENTATION_SUMMARY.md= - Debug functionality details
 
 ** Contributing
 
